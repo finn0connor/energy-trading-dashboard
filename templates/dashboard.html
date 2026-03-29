@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Energy Trading Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .header {
+            background: #fff;
+            padding: 16px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: #27ae60;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .timestamp {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .controls {
+            background: #fff;
+            padding: 16px 40px;
+            display: flex;
+            gap: 24px;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-group label {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .control-group input[type="date"],
+        .control-group select {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            font-size: 13px;
+            font-family: inherit;
+            color: #333;
+        }
+
+        .btn {
+            padding: 8px 20px;
+            background: #1a5276;
+            border: none;
+            color: #fff;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: #154360;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .main-content {
+            padding: 32px 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .chart-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .chart-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .chart-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+        }
+
+        .chart-subtitle {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .chart-stats {
+            display: flex;
+            gap: 24px;
+        }
+
+        .chart-stat {
+            text-align: right;
+        }
+
+        .chart-stat-label {
+            font-size: 10px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 2px;
+        }
+
+        .chart-stat-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .chart-body {
+            height: 300px;
+            width: 100%;
+            padding: 10px;
+        }
+
+        .message-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #888;
+            font-size: 13px;
+        }
+
+        .loading-spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #e0e0e0;
+            border-top-color: #1a5276;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            color: #c0392b;
+        }
+
+        .footer {
+            padding: 16px 40px;
+            background: #fff;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">Energy Trading Dashboard</div>
+        <div class="header-right">
+            <div class="live-indicator">
+                <div class="live-dot"></div>
+                <span>Live</span>
+            </div>
+            <div class="timestamp" id="currentTime"></div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>From</label>
+            <input type="date" id="startDate">
+        </div>
+        <div class="control-group">
+            <label>To</label>
+            <input type="date" id="endDate">
+        </div>
+        <div class="control-group">
+            <label>Region</label>
+            <select id="region">
+                <option value="ALL">All Island</option>
+                <option value="ROI">Republic of Ireland</option>
+                <option value="NI">Northern Ireland</option>
+            </select>
+        </div>
+        <button class="btn" id="loadBtn" onclick="loadAllData()">Load Data</button>
+    </div>
+
+    <div class="main-content">
+        <div class="chart-grid">
+            <!-- Wind Generation Chart -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Wind Generation</div>
+                        <div class="chart-subtitle">EirGrid · Actual vs Forecast</div>
+                    </div>
+                    <div class="chart-stats">
+                        <div class="chart-stat">
+                            <div class="chart-stat-label">Current Actual</div>
+                            <div class="chart-stat-value" id="windActual" style="color: #27ae60;">—</div>
+                        </div>
+                        <div class="chart-stat">
+                            <div class="chart-stat-label">Current Forecast</div>
+                            <div class="chart-stat-value" id="windForecast" style="color: #e67e22;">—</div>
+                        </div>
+                        <div class="chart-stat">
+                            <div class="chart-stat-label">Peak</div>
+                            <div class="chart-stat-value" id="windPeak">—</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-body" id="windChart">
+                    <div class="message-container">Select dates and click Load Data</div>
+                </div>
+            </div>
+
+            <!-- Demand Chart -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">System Demand</div>
+                        <div class="chart-subtitle">EirGrid Actual · EirGrid Forecast · SEMO Forecast</div>
+                    </div>
+                    <div class="chart-stats">
+                        <div class="chart-stat">
+                            <div class="chart-stat-label">Actual</div>
+                            <div class="chart-stat-value" id="demandActual" style="color: #9b59b6;">—</div>
+                        </div>
+                        <div class="chart-stat">
+                            <div class="chart-stat-label">EirGrid Fcst</div>
+                            <div class="chart-stat-value" id="demandEirgridForecast" style="color: #e67e22;">—</div>
+                        </div>
+                        <div class="chart-stat">
+                            <div class="chart-stat-label">SEMO Fcst</div>
+                            <div class="chart-stat-value" id="demandSemoForecast" style="color: #3498db;">—</div>
+                        </div>
+                        <div class="chart-stat">
+                            <div class="chart-stat-label">Peak</div>
+                            <div class="chart-stat-value" id="demandPeak">—</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-body" id="demandChart">
+                    <div class="message-container">Select dates and click Load Data</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <div>Sources: EirGrid, SEMO · <span id="lastUpdated">—</span></div>
+        <div>Data updated every 15 minutes</div>
+    </div>
+
+    <script>
+        const COLORS = {
+            windActual: '#27ae60',
+            windForecast: '#e67e22',
+            demandActual: '#9b59b6',
+            demandEirgridForecast: '#e67e22',
+            demandSemoForecast: '#3498db'
+        };
+
+        function getLayout() {
+            return {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { 
+                    family: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif',
+                    size: 11,
+                    color: '#666'
+                },
+                margin: { l: 60, r: 20, t: 10, b: 40 },
+                xaxis: { 
+                    gridcolor: '#eee',
+                    linecolor: '#ddd',
+                    tickformat: '%d %b %H:%M',
+                    tickfont: { size: 10, color: '#888' },
+                    tickangle: 0,
+                    nticks: 10
+                },
+                yaxis: { 
+                    gridcolor: '#eee',
+                    linecolor: '#ddd',
+                    tickformat: ',d',
+                    ticksuffix: ' MW',
+                    tickfont: { size: 10, color: '#888' }
+                },
+                hovermode: 'x unified',
+                showlegend: true,
+                legend: {
+                    orientation: 'h',
+                    yanchor: 'bottom',
+                    y: 1.02,
+                    xanchor: 'right',
+                    x: 1,
+                    font: { size: 11 }
+                }
+            };
+        }
+
+        const plotConfig = { responsive: true, displayModeBar: false };
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleString('en-GB', {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+            });
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            
+            document.getElementById('startDate').value = yesterday.toISOString().split('T')[0];
+            document.getElementById('endDate').value = today.toISOString().split('T')[0];
+            
+            loadAllData();
+        });
+
+        function getClosestValue(timestamps, values) {
+            const now = new Date();
+            let closest = null;
+            let minDiff = Infinity;
+            
+            for (let i = 0; i < timestamps.length; i++) {
+                const time = new Date(timestamps[i]);
+                const diff = Math.abs(time - now);
+                if (diff < minDiff && values[i] != null) {
+                    minDiff = diff;
+                    closest = values[i];
+                }
+            }
+            return closest;
+        }
+
+        function formatMW(val) {
+            return val != null ? Math.round(val).toLocaleString() + ' MW' : '—';
+        }
+
+        async function loadAllData() {
+            const btn = document.getElementById('loadBtn');
+            btn.disabled = true;
+            btn.textContent = 'Loading...';
+
+            await Promise.all([loadWindData(), loadDemandData()]);
+
+            document.getElementById('lastUpdated').textContent = 
+                'Updated ' + new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'});
+
+            btn.disabled = false;
+            btn.textContent = 'Load Data';
+        }
+
+        async function loadWindData() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const region = document.getElementById('region').value;
+            const container = document.getElementById('windChart');
+
+            container.innerHTML = '<div class="message-container"><div class="loading-spinner"></div>Loading...</div>';
+
+            try {
+                const response = await fetch(`/api/eirgrid/wind?start=${startDate}&end=${endDate}&region=${region}`);
+                const data = await response.json();
+
+                if (data.error) throw new Error(data.error);
+                if (!data.length) {
+                    container.innerHTML = '<div class="message-container">No data available</div>';
+                    return;
+                }
+
+                const actualData = data.filter(d => d.area === 'actual').sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                const forecastData = data.filter(d => d.area === 'forecast').sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+                const actualTimes = actualData.map(d => d.timestamp);
+                const actualValues = actualData.map(d => d.value);
+                const forecastTimes = forecastData.map(d => d.timestamp);
+                const forecastValues = forecastData.map(d => d.value);
+
+                document.getElementById('windActual').textContent = formatMW(getClosestValue(actualTimes, actualValues));
+                document.getElementById('windForecast').textContent = formatMW(getClosestValue(forecastTimes, forecastValues));
+                if (actualValues.length) {
+                    document.getElementById('windPeak').textContent = formatMW(Math.max(...actualValues));
+                }
+
+                container.innerHTML = '';
+
+                const traces = [];
+                if (forecastData.length) {
+                    traces.push({
+                        x: forecastTimes, y: forecastValues,
+                        type: 'scatter', mode: 'lines', name: 'Forecast',
+                        line: { color: COLORS.windForecast, width: 2, dash: 'dash' },
+                        hovertemplate: '%{y:,.0f} MW<extra>Forecast</extra>'
+                    });
+                }
+                if (actualData.length) {
+                    traces.push({
+                        x: actualTimes, y: actualValues,
+                        type: 'scatter', mode: 'lines', name: 'Actual',
+                        line: { color: COLORS.windActual, width: 2 },
+                        hovertemplate: '%{y:,.0f} MW<extra>Actual</extra>'
+                    });
+                }
+
+                const layout = getLayout();
+                Plotly.newPlot(container, traces, layout, plotConfig);
+
+            } catch (error) {
+                container.innerHTML = `<div class="message-container error-message">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function loadDemandData() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const region = document.getElementById('region').value;
+            const container = document.getElementById('demandChart');
+
+            container.innerHTML = '<div class="message-container"><div class="loading-spinner"></div>Loading...</div>';
+
+            try {
+                // Fetch both EirGrid and SEMO data
+                const [eirgridRes, semoRes] = await Promise.all([
+                    fetch(`/api/eirgrid/demand?start=${startDate}&end=${endDate}&region=${region}`),
+                    fetch(`/api/semo/load_forecast?start=${startDate}&end=${endDate}`)
+                ]);
+
+                const eirgridData = await eirgridRes.json();
+                const semoData = await semoRes.json();
+
+                // Process EirGrid data
+                let actualTimes = [], actualValues = [];
+                let eirgridForecastTimes = [], eirgridForecastValues = [];
+
+                if (eirgridData && !eirgridData.error && eirgridData.length) {
+                    const actualData = eirgridData.filter(d => d.area === 'actual').sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                    const forecastData = eirgridData.filter(d => d.area === 'forecast').sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+                    actualTimes = actualData.map(d => d.timestamp);
+                    actualValues = actualData.map(d => d.value);
+                    eirgridForecastTimes = forecastData.map(d => d.timestamp);
+                    eirgridForecastValues = forecastData.map(d => d.value);
+                }
+
+                // Process SEMO data
+                let semoTimes = [], semoValues = [];
+                if (semoData && !semoData.error && semoData.length) {
+                    const sorted = semoData.sort((a, b) => new Date(a.StartTime) - new Date(b.StartTime));
+                    semoTimes = sorted.map(d => d.StartTime);
+                    semoValues = sorted.map(d => d.AggregatedForecast);
+                }
+
+                // Check if we have any data
+                if (!actualTimes.length && !eirgridForecastTimes.length && !semoTimes.length) {
+                    container.innerHTML = '<div class="message-container">No data available</div>';
+                    return;
+                }
+
+                // Update stats
+                document.getElementById('demandActual').textContent = formatMW(getClosestValue(actualTimes, actualValues));
+                document.getElementById('demandEirgridForecast').textContent = formatMW(getClosestValue(eirgridForecastTimes, eirgridForecastValues));
+                document.getElementById('demandSemoForecast').textContent = formatMW(getClosestValue(semoTimes, semoValues));
+
+                const allValues = [...actualValues, ...eirgridForecastValues, ...semoValues].filter(v => v != null);
+                if (allValues.length) {
+                    document.getElementById('demandPeak').textContent = formatMW(Math.max(...allValues));
+                }
+
+                container.innerHTML = '';
+
+                // Build traces
+                const traces = [];
+
+                if (semoTimes.length) {
+                    traces.push({
+                        x: semoTimes, y: semoValues,
+                        type: 'scatter', mode: 'lines', name: 'SEMO Forecast',
+                        line: { color: COLORS.demandSemoForecast, width: 2, dash: 'dot' },
+                        hovertemplate: '%{y:,.0f} MW<extra>SEMO Forecast</extra>'
+                    });
+                }
+
+                if (eirgridForecastTimes.length) {
+                    traces.push({
+                        x: eirgridForecastTimes, y: eirgridForecastValues,
+                        type: 'scatter', mode: 'lines', name: 'EirGrid Forecast',
+                        line: { color: COLORS.demandEirgridForecast, width: 2, dash: 'dash' },
+                        hovertemplate: '%{y:,.0f} MW<extra>EirGrid Forecast</extra>'
+                    });
+                }
+
+                if (actualTimes.length) {
+                    traces.push({
+                        x: actualTimes, y: actualValues,
+                        type: 'scatter', mode: 'lines', name: 'Actual',
+                        line: { color: COLORS.demandActual, width: 2 },
+                        hovertemplate: '%{y:,.0f} MW<extra>Actual</extra>'
+                    });
+                }
+
+                const layout = getLayout();
+                Plotly.newPlot(container, traces, layout, plotConfig);
+
+            } catch (error) {
+                container.innerHTML = `<div class="message-container error-message">Error: ${error.message}</div>`;
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            ['windChart', 'demandChart'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el && el.data) Plotly.Plots.resize(el);
+            });
+        });
+    </script>
+</body>
+</html>
